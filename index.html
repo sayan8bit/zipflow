@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZipFlow — Premium Online & Offline Zip Utility</title>
+  <meta name="description"
+    content="A secure, beautiful, responsive PWA to browse, search, and selectively extract files from ZIP archives 100% offline and client-side.">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0B0F19">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ZipFlow">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-container">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <path d="M12 11v6"></path>
+            <path d="M9 14h6"></path>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>Zip<span class="gradient-text">Flow</span></h1>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- PWA Install Button -->
+        <button id="install-btn" class="btn btn-secondary btn-sm hidden">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Install App</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+
+      <!-- Section 1: Dropzone (Initial state) -->
+      <section id="upload-section" class="section-container active">
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".zip" class="hidden-file-input">
+          <div class="dropzone-content">
+            <div class="upload-icon-wrapper">
+              <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <h2>Drop your ZIP file here</h2>
+            <p class="dropzone-description">Drag and drop or click to browse files from your computer</p>
+            <p class="privacy-note">🔒 Max privacy: Processing is done entirely on your device. Works 100% offline.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+              Select ZIP File
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Explorer (Visible when ZIP is loaded) -->
+      <section id="explorer-section" class="section-container">
+        <div class="explorer-grid">
+          <!-- Explorer Sidebar / Controls -->
+          <div class="explorer-sidebar">
+            <div class="panel file-info-panel">
+              <button id="close-zip-btn" class="btn btn-icon-text btn-text">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>Back to Upload</span>
+              </button>
+              <div class="zip-meta-info">
+                <h3 id="zip-name" class="zip-title">archive.zip</h3>
+                <div class="stat-grid">
+                  <div class="stat-item">
+                    <span class="stat-label">Files</span>
+                    <span id="stat-files" class="stat-value">0</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Total Size</span>
+                    <span id="stat-size" class="stat-value">0 B</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Compressed</span>
+                    <span id="stat-comp-size" class="stat-value">0 B</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Ratio</span>
+                    <span id="stat-ratio" class="stat-value">0%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Search and Filter Panel -->
+            <div class="panel control-panel">
+              <div class="search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                  stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search files & folders..." autocomplete="off">
+                <button id="search-clear-btn" class="btn-clear-search hidden">✕</button>
+              </div>
+
+              <!-- Quick File Type Filters -->
+              <div class="filter-section">
+                <h4>Filter by Type</h4>
+                <div class="filter-tags" id="filter-tags-container">
+                  <button class="filter-tag active" data-filter="all">All</button>
+                  <button class="filter-tag" data-filter="image">Images</button>
+                  <button class="filter-tag" data-filter="code">Code/Text</button>
+                  <button class="filter-tag" data-filter="pdf">PDF</button>
+                  <button class="filter-tag" data-filter="audio-video">Media</button>
+                </div>
+              </div>
+
+              <!-- Selection Actions -->
+              <div class="actions-section">
+                <div class="selection-summary">
+                  <span id="selection-count">0 items selected</span>
+                </div>
+                <div class="selection-shortcuts">
+                  <button id="select-all-btn" class="btn btn-secondary btn-xs">Select All</button>
+                  <button id="select-none-btn" class="btn btn-secondary btn-xs">Deselect All</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Batch Download Action Panel (Desktop Fallback) -->
+            <div class="panel batch-panel">
+              <button id="download-selected-unzipped-btn" class="btn btn-primary btn-full-width disabled">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Extract Selected (Unzipped)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Explorer Folder Tree -->
+          <div class="explorer-content panel">
+            <div class="tree-header">
+              <div class="col-checkbox">
+                <input type="checkbox" id="header-select-all" class="custom-checkbox">
+              </div>
+              <div class="col-name">Name</div>
+              <div class="col-size">Size</div>
+              <div class="col-comp-size">Compressed</div>
+              <div class="col-actions">Actions</div>
+            </div>
+            <div id="tree-container" class="tree-container">
+              <!-- Dynamically populated files and folder tree rows -->
+            </div>
+            <div id="no-results" class="no-results hidden">
+              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <p>No matching files found</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Floating Bottom Selection Action Drawer -->
+  <div id="selection-drawer" class="selection-drawer hidden-drawer">
+    <div class="drawer-content">
+      <span id="drawer-count">0 items selected</span>
+      <div class="drawer-actions">
+        <button id="drawer-download-btn" class="btn btn-primary btn-sm">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Extract Selected</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="overlay hidden">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <h3 id="loading-title">Parsing Archive</h3>
+      <p id="loading-message">Reading files from local zip...</p>
+      <div class="progress-bar-container">
+        <div id="loading-progress" class="progress-bar" style="width: 0%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="preview-modal" class="overlay hidden">
+    <div class="preview-card">
+      <header class="preview-header">
+        <div class="preview-file-details">
+          <span class="preview-file-icon" id="preview-icon"></span>
+          <div>
+            <h3 id="preview-filename">file.txt</h3>
+            <span id="preview-filesize" class="preview-filesize">12.5 KB</span>
+          </div>
+        </div>
+        <div class="preview-actions">
+          <button id="preview-download-btn" class="btn btn-secondary btn-sm">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download</span>
+          </button>
+          <button id="close-preview-btn" class="btn-close-modal">✕</button>
+        </div>
+      </header>
+      <div class="preview-body" id="preview-body">
+        <!-- Render preview content here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- JSZip Dependencies -->
+  <script src="lib/jszip.min.js"></script>
+  <!-- Application Scripts -->
+  <script src="app.js"></script>
+</body>
+
+</html>

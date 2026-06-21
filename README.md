@@ -1,5 +1,4 @@
-
-# ZipFlow Walkthrough
+# ZipFlow
 
 ZipFlow is a modern, responsive, offline-first Progressive Web Application (PWA) built to explore and selectively extract files from ZIP archives directly on the client side with a premium dark-themed UI.
 

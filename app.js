@@ -15,6 +15,7 @@ let flatNodesList = [];
 let selectedFilesCount = 0;
 let currentSearchQuery = '';
 let currentFilter = 'all';
+let currentPreviewNode = null;
 
 // --- UI Elements ---
 const dropzone = document.getElementById('dropzone');
@@ -57,6 +58,9 @@ const previewIcon = document.getElementById('preview-icon');
 const previewBody = document.getElementById('preview-body');
 const previewDownloadBtn = document.getElementById('preview-download-btn');
 const closePreviewBtn = document.getElementById('close-preview-btn');
+const previewPrevBtn = document.getElementById('preview-prev-btn');
+const previewNextBtn = document.getElementById('preview-next-btn');
+const previewCounter = document.getElementById('preview-counter');
 
 const installBtn = document.getElementById('install-btn');
 
@@ -778,64 +782,48 @@ drawerDownloadBtn.addEventListener('click', () => {
 // --- Preview Modal Logic ---
 let activePreviewBlobUrl = null;
 
-async function triggerPreview(node) {
-  if (!node.jszipEntry) return;
-
-  if (activePreviewBlobUrl) {
-    URL.revokeObjectURL(activePreviewBlobUrl);
-    activePreviewBlobUrl = null;
-  }
-
-  showLoading('Loading Preview', `Decompressing ${node.name} content...`, 30);
-  previewFilename.textContent = node.name;
-  previewFilesize.textContent = formatBytes(node.size);
-  previewIcon.innerHTML = getFileTypeSVG(false, node.name);
-  previewBody.innerHTML = '';
-
-  previewDownloadBtn.onclick = () => downloadSingleFile(node);
-
-  try {
-    const cat = getFileCategory(node.name);
-
-    if (node.size > 5 * 1024 * 1024) {
-      renderBinaryPreview(node, 'File is too large to preview (> 5MB). Please download to view.');
-    } else if (cat === 'image') {
-      const blob = await node.jszipEntry.async('blob');
-      activePreviewBlobUrl = URL.createObjectURL(blob);
-      
-      const img = document.createElement('img');
-      img.src = activePreviewBlobUrl;
-      img.className = 'preview-image';
-      img.alt = node.name;
-      
-      const container = document.createElement('div');
-      container.className = 'preview-image-container';
-      container.appendChild(img);
-      
-      previewBody.appendChild(container);
-      openModal();
-    } else if (cat === 'code') {
-      const text = await node.jszipEntry.async('string');
-      
-      const pre = document.createElement('pre');
-      pre.className = 'preview-text';
-      pre.textContent = text;
-      
-      previewBody.appendChild(pre);
-      openModal();
-    } else {
-      const arr = await node.jszipEntry.async('uint8array');
-      renderBinaryPreview(node, null, arr);
+// Get all files matching search/filter in tree order
+function getPreviewableFiles() {
+  const files = [];
+  function traverse(node) {
+    if (node.isFile) {
+      const matchesSearch = checkSearchMatch(node);
+      const matchesFilter = checkFilterMatch(node);
+      let isVisible = true;
+      if (currentSearchQuery) {
+        isVisible = matchesSearch;
+      } else if (currentFilter !== 'all') {
+        isVisible = matchesFilter;
+      }
+      if (isVisible) {
+        files.push(node);
+      }
+    } else if (node.isDirectory) {
+      node.children.forEach(traverse);
     }
-  } catch (err) {
-    console.error(err);
-    showToast('Could not load file preview.', 'error');
-  } finally {
-    hideLoading();
+  }
+  if (rootNode) traverse(rootNode);
+  return files;
+}
+
+// Update Prev/Next button states and the slide counter
+function updatePreviewNavButtons(index, total) {
+  if (total <= 1) {
+    previewPrevBtn.classList.add('hidden');
+    previewNextBtn.classList.add('hidden');
+    previewCounter.textContent = '';
+  } else {
+    previewPrevBtn.classList.remove('hidden');
+    previewNextBtn.classList.remove('hidden');
+    previewCounter.textContent = `${index + 1} / ${total}`;
+    
+    previewPrevBtn.disabled = (index === 0);
+    previewNextBtn.disabled = (index === total - 1);
   }
 }
 
-function renderBinaryPreview(node, message, uint8Array = null) {
+// Helper to fill a slide with binary preview content
+function populateBinaryPreview(slideElement, node, message, uint8Array = null) {
   const container = document.createElement('div');
   container.className = 'preview-binary-message';
 
@@ -884,8 +872,138 @@ function renderBinaryPreview(node, message, uint8Array = null) {
     container.appendChild(hexDump);
   }
 
-  previewBody.appendChild(container);
-  openModal();
+  slideElement.appendChild(container);
+}
+
+// Populate slide based on file category
+async function loadSlideContent(node, slideElement) {
+  const cat = getFileCategory(node.name);
+  if (node.size > 5 * 1024 * 1024) {
+    populateBinaryPreview(slideElement, node, 'File is too large to preview (> 5MB). Please download to view.');
+  } else if (cat === 'image') {
+    const blob = await node.jszipEntry.async('blob');
+    const blobUrl = URL.createObjectURL(blob);
+    slideElement.dataset.blobUrl = blobUrl;
+    
+    const img = document.createElement('img');
+    img.src = blobUrl;
+    img.className = 'preview-image';
+    img.alt = node.name;
+    
+    const container = document.createElement('div');
+    container.className = 'preview-image-container';
+    container.appendChild(img);
+    slideElement.appendChild(container);
+  } else if (cat === 'code') {
+    const text = await node.jszipEntry.async('string');
+    const pre = document.createElement('pre');
+    pre.className = 'preview-text';
+    pre.textContent = text;
+    slideElement.appendChild(pre);
+  } else {
+    const arr = await node.jszipEntry.async('uint8array');
+    populateBinaryPreview(slideElement, node, null, arr);
+  }
+}
+
+// Slide transition navigation
+async function navigateToSlide(nextNode, direction = 'next') {
+  if (!nextNode || nextNode === currentPreviewNode) return;
+  
+  const files = getPreviewableFiles();
+  const index = files.indexOf(nextNode);
+  if (index === -1) return;
+  
+  currentPreviewNode = nextNode;
+  
+  // Update detail labels immediately
+  previewFilename.textContent = nextNode.name;
+  previewFilesize.textContent = formatBytes(nextNode.size);
+  previewIcon.innerHTML = getFileTypeSVG(false, nextNode.name);
+  previewDownloadBtn.onclick = () => downloadSingleFile(nextNode);
+  
+  updatePreviewNavButtons(index, files.length);
+
+  const newSlide = document.createElement('div');
+  newSlide.className = 'preview-slide';
+  
+  if (direction === 'next') {
+    newSlide.classList.add('slide-enter-right');
+  } else {
+    newSlide.classList.add('slide-enter-left');
+  }
+  
+  showLoading('Loading Preview', `Decompressing ${nextNode.name} content...`, 30);
+  try {
+    await loadSlideContent(nextNode, newSlide);
+    
+    const currentSlide = previewBody.querySelector('.preview-slide.slide-active');
+    
+    // Append new slide
+    previewBody.appendChild(newSlide);
+    
+    // Animate transition
+    if (currentSlide) {
+      currentSlide.classList.remove('slide-active');
+      if (direction === 'next') {
+        currentSlide.classList.add('slide-exit-left');
+      } else {
+        currentSlide.classList.add('slide-exit-right');
+      }
+      
+      setTimeout(() => {
+        if (currentSlide.dataset.blobUrl) {
+          URL.revokeObjectURL(currentSlide.dataset.blobUrl);
+        }
+        currentSlide.remove();
+      }, 400); // matches CSS transition duration
+    }
+    
+    // Trigger reflow to start transition
+    void newSlide.offsetWidth;
+    newSlide.classList.remove('slide-enter-right', 'slide-enter-left');
+    newSlide.classList.add('slide-active');
+    
+  } catch (err) {
+    console.error(err);
+    showToast('Could not load file preview.', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function triggerPreview(node) {
+  if (!node.jszipEntry) return;
+
+  const files = getPreviewableFiles();
+  const index = files.indexOf(node);
+  if (index === -1) return;
+  
+  currentPreviewNode = node;
+  
+  previewFilename.textContent = node.name;
+  previewFilesize.textContent = formatBytes(node.size);
+  previewIcon.innerHTML = getFileTypeSVG(false, node.name);
+  previewBody.innerHTML = ''; // Clear existing slides
+  
+  previewDownloadBtn.onclick = () => downloadSingleFile(node);
+  
+  updatePreviewNavButtons(index, files.length);
+  
+  const slide = document.createElement('div');
+  slide.className = 'preview-slide slide-active';
+  
+  showLoading('Loading Preview', `Decompressing ${node.name} content...`, 30);
+  try {
+    await loadSlideContent(node, slide);
+    previewBody.appendChild(slide);
+    openModal();
+  } catch (err) {
+    console.error(err);
+    showToast('Could not load file preview.', 'error');
+  } finally {
+    hideLoading();
+  }
 }
 
 function openModal() {
@@ -894,6 +1012,16 @@ function openModal() {
 
 function closeModal() {
   previewModal.classList.add('hidden');
+  
+  // Revoke any blob URL stored on slides and remove them
+  const slides = previewBody.querySelectorAll('.preview-slide');
+  slides.forEach(slide => {
+    if (slide.dataset.blobUrl) {
+      URL.revokeObjectURL(slide.dataset.blobUrl);
+    }
+    slide.remove();
+  });
+  
   if (activePreviewBlobUrl) {
     URL.revokeObjectURL(activePreviewBlobUrl);
     activePreviewBlobUrl = null;
@@ -905,9 +1033,72 @@ previewModal.addEventListener('click', (e) => {
   if (e.target === previewModal) closeModal();
 });
 
+// Click handlers for next/prev buttons
+previewPrevBtn.addEventListener('click', () => {
+  const files = getPreviewableFiles();
+  const currentIndex = files.indexOf(currentPreviewNode);
+  if (currentIndex > 0) {
+    navigateToSlide(files[currentIndex - 1], 'prev');
+  }
+});
+
+previewNextBtn.addEventListener('click', () => {
+  const files = getPreviewableFiles();
+  const currentIndex = files.indexOf(currentPreviewNode);
+  if (currentIndex < files.length - 1) {
+    navigateToSlide(files[currentIndex + 1], 'next');
+  }
+});
+
+// Touch swipe gesture implementation
+let touchStartX = 0;
+let touchEndX = 0;
+
+previewBody.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+previewBody.addEventListener('touchend', (e) => {
+  touchEndX = e.changedTouches[0].screenX;
+  handleSwipe();
+}, { passive: true });
+
+function handleSwipe() {
+  const swipeThreshold = 50; // min swipe distance in px
+  const files = getPreviewableFiles();
+  const currentIndex = files.indexOf(currentPreviewNode);
+  
+  if (touchEndX < touchStartX - swipeThreshold) {
+    // Swiped left -> load next slide
+    if (currentIndex < files.length - 1) {
+      navigateToSlide(files[currentIndex + 1], 'next');
+    }
+  } else if (touchEndX > touchStartX + swipeThreshold) {
+    // Swiped right -> load prev slide
+    if (currentIndex > 0) {
+      navigateToSlide(files[currentIndex - 1], 'prev');
+    }
+  }
+}
+
+// Window Keydown listener (Escape for close, Left/Right for nav)
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !previewModal.classList.contains('hidden')) {
+  if (previewModal.classList.contains('hidden')) return;
+
+  if (e.key === 'Escape') {
     closeModal();
+  } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+    const files = getPreviewableFiles();
+    const currentIndex = files.indexOf(currentPreviewNode);
+    if (currentIndex < files.length - 1) {
+      navigateToSlide(files[currentIndex + 1], 'next');
+    }
+  } else if (e.key === 'ArrowLeft' || e.key === 'Left') {
+    const files = getPreviewableFiles();
+    const currentIndex = files.indexOf(currentPreviewNode);
+    if (currentIndex > 0) {
+      navigateToSlide(files[currentIndex - 1], 'prev');
+    }
   }
 });
 
